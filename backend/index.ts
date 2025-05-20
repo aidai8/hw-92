@@ -5,6 +5,9 @@ import WebSocket from "ws";
 import usersRouter from "./routers/users";
 import config from "./config";
 import mongoose from "mongoose";
+import {ChatMessage, ChatMessageDocument} from "./models/ChatMessage";
+import jwt, {JwtPayload} from "jsonwebtoken";
+import User, {JWT_SECRET} from "./models/User";
 
 const app = express();
 const wsInstance = expressWs(app);
@@ -30,46 +33,77 @@ const router = express.Router();
 wsInstance.applyTo(router);
 
 const connectedClient: WebSocket[] = [];
+const onlineUsers = new Map<string, WebSocket>();
 
 interface IncomingMessage {
    type: string;
    payload: string;
 }
 
-router.ws('/chat', (ws, req) => {
-   console.log('Client connected');
-   let username = 'Anonymous';
 
-   connectedClient.push(ws);
-   console.log('Total connections: ' + connectedClient.length);
+const showOnlineUsers = () => {
+   const usersList = Array.from(onlineUsers.keys());
+   connectedClient.forEach(client => {
+      client.send(JSON.stringify({
+         type: "ONLINE_USERS",
+         payload: usersList
+      }));
+   });
+};
 
-   ws.on('message', (message) => {
-      try {
-         const decodedMessage = JSON.parse(message.toString()) as IncomingMessage;
-         console.log(decodedMessage);
-
-         if (decodedMessage.type === "SEND_MESSAGE") {
-            connectedClient.forEach((clientWS) => {
-               clientWS.send(JSON.stringify({
-                  type: "NEW_MESSAGE",
-                  payload: {username: username, text: decodedMessage.payload}
-               }));
-            });
-         } else if (decodedMessage.type === "SET_USERNAME") {
-            username = decodedMessage.payload;
+const showNewMessage = (message: ChatMessageDocument) => {
+   connectedClient.forEach(client => {
+      client.send(JSON.stringify({
+         type: "NEW_MESSAGE",
+         payload: {
+            username: message.username,
+            text: message.text
          }
-
-      } catch (e) {
-         ws.send(JSON.stringify({error: 'Invalid message'}));
-      }
+      }));
    });
+};
 
-   ws.on('close', () => {
-      console.log('Client disconnected');
-      const index = connectedClient.indexOf(ws);
-      connectedClient.splice(index, 1);
-      console.log('Total connections: ' + connectedClient.length);
-   });
+router.ws('/chat', async (ws, req) => {
+   const token = req.query.token as string;
+
+   try {
+      const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload & {_id: string};
+      const user = await User.findById(decoded._id);
+      if (!user) throw new Error("User not found");
+
+      const username = user.username;
+      onlineUsers.set(username, ws);
+      connectedClient.push(ws);
+      showOnlineUsers();
+
+      const messages = await ChatMessage.find().sort({createdAt: -1}).limit(30);
+      ws.send(JSON.stringify({
+         type: "INIT_MESSAGES",
+         payload: messages.reverse()
+      }));
+
+      ws.on('message', async (msg) => {
+         const decodedMsg = JSON.parse(msg.toString()) as IncomingMessage;
+         if (decodedMsg.type === "SEND_MESSAGE") {
+            const newMessage = new ChatMessage({
+               username,
+               text: decodedMsg.payload
+            });
+            await newMessage.save();
+            showNewMessage(newMessage);
+         }
+      });
+
+      ws.on('close', () => {
+         onlineUsers.delete(username);
+         const index = connectedClient.indexOf(ws);
+         if (index !== -1) connectedClient.splice(index, 1);
+         showOnlineUsers();
+      });
+
+   } catch (err) {
+      ws.close(1008, err instanceof Error ? err.message : "Auth error");
+   }
 });
 
 app.use(router);
