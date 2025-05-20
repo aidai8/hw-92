@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from "react";
 import type {ChatMessage, IncomingMessage} from "../../types";
-import {Box, Button, Card, CardContent, Container, Divider, List, ListItem, Paper, TextField, Typography, Avatar, Badge, Chip} from "@mui/material";
+import {Box, Button, Card, CardContent, Container, Divider, List, ListItem, Paper, TextField, Typography, Avatar, Chip} from "@mui/material";
 import Grid from '@mui/material/Grid2';
 import {styled} from "@mui/material/styles";
 import {useAppSelector} from "../../app/hooks.ts";
@@ -15,16 +15,6 @@ const MessageCard = styled(Card)(({theme}) => ({
         backgroundColor: theme.palette.success.light,
     },
 }));
-
-const OnlineUserBadge = styled(Badge)(({theme}) => ({
-    "& .MuiBadge-badge": {
-        backgroundColor: theme.palette.success.main,
-        color: theme.palette.success.main,
-        boxShadow: `0 0 0 2px ${theme.palette.background.paper}`,
-    },
-}));
-
-
 
 const Chat = () => {
     const user = useAppSelector(selectUser);
@@ -96,11 +86,9 @@ const Chat = () => {
                                 size="small"
                                 sx={{mr: 1}}
                                 avatar={
-                                    <OnlineUserBadge overlap="circular" variant="dot">
-                                        <Avatar sx={{width: 24, height: 24}}>
-                                            {username.charAt(0).toUpperCase()}
-                                        </Avatar>
-                                    </OnlineUserBadge>
+                                <Avatar sx={{width: 24, height: 24}}>
+                                    {username.charAt(0).toUpperCase()}
+                                </Avatar>
                                 }
                             />
                         ))}

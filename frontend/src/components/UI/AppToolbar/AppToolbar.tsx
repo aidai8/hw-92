@@ -23,7 +23,7 @@ const AppToolbar = () => {
                 <Container maxWidth="xl">
                     <Grid container spacing={2} justifyContent="space-between" alignItems="center">
                         <Typography variant="h6" component="div" sx={{flexGrow: 1}}>
-                            <Link to="/">Chat!!</Link>
+                            <Link to="/chat">Chat!!</Link>
                         </Typography>
                         {user ?
                             (<UserMenu user={user}/>)
